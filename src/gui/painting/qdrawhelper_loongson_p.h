@@ -90,6 +90,98 @@ _mm_danas_byte_mul_pi16(__m32 __m1, __m32 __m2, __m64 __m3, __m64 __m4)
     return ret;
 }
 
+extern __inline __m64 __attribute__ ((__gnu_inline__, __always_inline__, __artificial__))
+_mm_das_byte_mul_pi16(__m32 __m1, __m32 __m2, __m64 __m3)
+{
+    __m64 ret; 
+    asm(".set noreorder\r\n"
+        "mtc1       $0, $f6\n\t"
+        "punpcklbh  $f0, %1, $f6\n\t"
+        "punpcklbh  $f2, %2, $f6\n\t"
+
+        "punpckhhw  $f4, $f2, $f2\n\t"
+        "punpckhhw  $f4, $f4, $f4\n\t"
+
+        "pmullh     $f4, $f0, $f4\n\t"
+        "paddush    $f4, $f4, %3\n\t"
+
+        "li         $8, 8\n\t"
+        "mtc1       $8, $f6\n\t"
+        "psrlh      $f0, $f4, $f6\n\t"
+        "paddush    $f0, $f0, $f4\n\t"
+        "psrlh      %0, $f0, $f6\n\t"
+        ".set reorder\r\n":"=f"(ret)
+        :"f"(__m1), "f"(__m2), "f"(__m3)
+        :"$8", "$f0", "$f2", "$f4", "$f6", "memory"
+        );   
+    return ret; 
+}
+
+extern __inline __m64 __attribute__ ((__gnu_inline__, __always_inline__, __artificial__))
+_mm_dnas_byte_mul_pi16(__m32 __m1, __m32 __m2, __m64 __m3, __m64 __m4)
+{
+    __m64 ret; 
+    asm(".set noreorder\r\n"
+        "mtc1       $0, $f6\n\t"
+        "punpcklbh  $f0, %1, $f6\n\t"
+        "punpcklbh  $f2, %2, $f6\n\t"
+
+        "punpckhhw  $f4, $f2, $f2\n\t"
+        "punpckhhw  $f4, $f4, $f4\n\t"
+        "xor        $f4, $f4, %4\n\t"
+
+        "pmullh     $f4, $f0, $f4\n\t"
+        "paddush    $f4, $f4, %3\n\t"
+
+        "li         $8, 8\n\t"
+        "mtc1       $8, $f6\n\t"
+        "psrlh      $f0, $f4, $f6\n\t"
+        "paddush    $f0, $f0, $f4\n\t"
+        "psrlh      %0, $f0, $f6\n\t"
+        ".set reorder\r\n"
+        :"=f"(ret)
+        :"f"(__m1), "f"(__m2), "f"(__m3), "f"(__m4)
+        :"$8", "$f0", "$f2", "$f4", "$f6", "memory"
+        );   
+    return ret; 
+}
+
+extern __inline __m64 __attribute__ ((__gnu_inline__, __always_inline__, __artificial__))
+_mm_adnas_byte_mul_pi16(__m32 __m1, __m32 __m2, __m64 __m3, __m64 __m4)
+
+{
+    __m64 ret; 
+    asm(".set noreorder\r\n"
+        "mtc1       $0, $f6\n\t"
+        "punpcklbh  $f0, %1, $f6\n\t"   //dst   src64
+        "punpcklbh  $f2, %2, $f6\n\t"   //src64  dst
+
+        "punpckhhw  $f4, $f2, $f2\n\t"  
+        "punpckhhw  $f4, $f4, $f4\n\t"
+        "xor        $f4, $f4, %4\n\t"   //asrc  dia
+
+        "punpckhhw  $f8, $f0, $f0\n\t"
+        "punpckhhw  $f8, $f8, $f8\n\t"  //da     asrc
+
+        "pmullh     $f0, $f0, $f4\n\t"  //dst*asrc  src64*dia
+        "pmullh     $f2, $f2, $f8\n\t"  //src64*da  dst*asrc
+        "paddush    $f2, $f2, $f0\n\t"  //src64 + dst
+
+        "paddush    $f2, $f2, %3\n\t"
+
+        "li         $8, 8\n\t"
+        "mtc1       $8, $f6\n\t"
+        "psrlh      $f0, $f2, $f6\n\t"
+        "paddush    $f2, $f2, $f0\n\t"
+        "psrlh      %0, $f2, $f6\n\t"
+        ".set reorder\r\n":"=f"(ret)
+        :"f"(__m1), "f"(__m2), "f"(__m3), "f"(__m4)
+        :"$8", "$f0", "$f2", "$f4", "$f6", "$f8", "memory"
+        );   
+    return ret; 
+}
+
+
 static inline __m64 _byte_mul(const __m64 &a, const __m64 &b,
                             const __m64 &mmx_0x0080)
 {
@@ -136,6 +228,8 @@ static inline __m64 _load_alpha(uint x, const __m64 &) {
 #define premul(x) _premul(x, mmx_0x0080)
 #define load(x) _load(x)
 #define load_alpha(x) _load_alpha(x, _mm_setzero_si64())
+
+#    define PRELOAD_COND2(x,y)
 
 void qt_memfill32_template_lssimd(uint *dest, uint value, int count)
 {
@@ -602,6 +696,327 @@ static void QT_FASTCALL rasterop_solid_NotSourceAndDestination_lssimd(uint *dest
                                                                       uint const_alpha)
 {
     rasterop_solid_SourceAndDestination_lssimd(dest, length, ~color, const_alpha);
+}
+
+static void QT_FASTCALL comp_func_solid_DestinationOver_lssimd(uint * dest,
+                                                                int length,
+                                                                uint color,
+                                                                uint const_alpha)
+{
+    __m64 mmx_0x0080 = _mm_set1_pi16(0x80);
+    __m64 mmx_0x00ff = _mm_set1_pi16(0xff);
+    __m64 color64 = _mm_loadlo_pi8(&color);
+    if (const_alpha != 255) {
+        __m64 ca = load_alpha(const_alpha);
+        color64 = _mm_mullo_pi16(color64, ca); 
+        color64 = _mm_ands_srli_pi16(color64, mmx_0x0080);
+    }    
+    for (int i = 0; i < length; ++i) {
+        __m64 dest64 = _mm_loadlo_pi8(&dest[i]);
+        __m64 dia = negate(alpha(dest64));
+
+        __m64 col = _mm_mullo_pi16(color64, dia);
+        col = _mm_ands_srli_pi16(col, mmx_0x0080);
+        __m64 dst = _mm_adds_pu16(dest64, color64);
+        _mm_store_pi32(reinterpret_cast<__m32 *>(&dest[i]), dst);
+    }
+}
+
+static void QT_FASTCALL comp_func_DestinationOver_lssimd(uint *dest,
+                                                         const uint *src,
+                                                         int length,
+                                                         uint const_alpha)
+{
+    __m64 mmx_0x0080 = _mm_set1_pi16(0x80);
+    __m64 mmx_0x00ff = _mm_set1_pi16(0xff);
+    if (const_alpha == 255) {
+        for (int i = 0; i < length; ++i) {
+            PRELOAD_COND2(dest, src)
+            uint d = dest[i];
+            dest[i] = d + BYTE_MUL(src[i], qAlpha(~d));
+        }
+    } else {
+        __m64 ca = load_alpha(const_alpha);
+        for (int i = 0; i < length; ++i) {
+            __m64 dest64 = _mm_loadlo_pi8(&dest[i]);
+            __m64 dia = negate(alpha(dest64));
+
+            __m64 src64 = _mm_loadlo_pi8(&src[i]);
+            __m64 srca = _mm_mullo_pi16(src64, ca);
+            srca = _mm_ands_srli_pi16(srca, mmx_0x0080);
+
+            __m64 dst = _mm_mullo_pi16(srca, dia);
+            dst = _mm_ands_srli_pi16(dst, mmx_0x0080);
+            dst = _mm_adds_pu16(dest64, dst);
+            _mm_store_pi32(reinterpret_cast<__m32 *>(&dest[i]), dst);
+        }
+    }
+}
+
+static void QT_FASTCALL comp_func_SourceIn_lssimd(uint *dest,
+                                                  const uint *src,
+                                                  int length,
+                                                  uint const_alpha)
+{
+    if (const_alpha == 255) {
+        for (int i = 0; i < length; ++i) {
+            PRELOAD_COND2(dest, src)
+            dest[i] = BYTE_MUL(src[i], qAlpha(dest[i]));
+        }
+    } else {
+        __m64 mmx_0x0080 = _mm_set1_pi16(0x80);
+        __m64 mmx_0x00ff = _mm_set1_pi16(0xff);
+        __m64 ca = load_alpha(const_alpha);
+        __m64 cia = negate(ca);
+        for (int i = 0; i < length; ++i) {
+            __m64 src64 = _mm_loadlo_pi8(&src[i]);
+            src64 = _mm_mullo_pi16(src64, ca);
+            src64 = _mm_ands_srli_pi16(src64, mmx_0x0080);
+            __m64 dst = _mm_loadlo_pi8(&dest[i]);
+
+            src64 = _mm_mullo_pi16(src64, alpha(dst));
+            dst = _mm_mullo_pi16(dst, cia);
+            dst = _mm_adds_pu16(src64, dst);
+            dst = _mm_ands_srli_pi16(dst, mmx_0x0080);
+            _mm_store_pi32(reinterpret_cast<__m32 *>(&dest[i]), dst);
+        }
+    }
+}
+
+static void QT_FASTCALL comp_func_solid_DestinationIn_lssimd(uint * dest,
+                                                            int length,
+                                                            uint color,
+                                                            uint const_alpha)
+{
+    __m64 mmx_0x0080 = _mm_set1_pi16(0x80);
+    __m64 mmx_0x00ff = _mm_set1_pi16(0xff);
+    __m64 acolor = alpha(_mm_loadlo_pi8(&color));
+    if (const_alpha != 255) {
+        __m64 ca = load_alpha(const_alpha);
+        __m64 cia = negate(ca);
+        acolor = _mm_mullo_pi16(acolor, ca);
+        acolor = _mm_ands_srli_pi16(acolor, mmx_0x0080);
+        acolor = add(acolor, cia);
+    }
+    for (int i = 0; i < length; ++i) {
+        __m64 dst = _mm_loadlo_pi8(&dest[i]);
+        dst = _mm_mullo_pi16(dst, acolor);
+        dst = _mm_ands_srli_pi16(dst, mmx_0x0080);
+        _mm_store_pi32(reinterpret_cast<__m32 *>(&dest[i]), dst);
+    }
+}
+
+static void QT_FASTCALL comp_func_DestinationIn_lssimd(uint *dest,
+                                                       const uint *src,
+                                                       int length,
+                                                       uint const_alpha)
+{
+    __m64 mmx_0x0080 = _mm_set1_pi16(0x80);
+    __m64 mmx_0x00ff = _mm_set1_pi16(0xff);
+    if (const_alpha == 255) {
+        for (int i = 0; i < length; ++i) {
+            __m64 dst = _mm_das_byte_mul_pi16(*(__m32 *)&dest[i],
+                                    *(__m32 *)& src[i], mmx_0x0080);
+            _mm_store_pi32(reinterpret_cast<__m32 *>(&dest[i]), dst);
+        }
+    } else {
+        __m64 ca = load_alpha(const_alpha);
+        __m64 cia = negate(ca);
+        for (int i = 0; i < length; ++i) {
+            __m64 dst = _mm_loadlo_pi8(&dest[i]);
+            __m64 asrc = alpha(_mm_loadlo_pi8(&src[i]));
+            asrc = _mm_mullo_pi16(asrc, ca);
+            asrc = _mm_ands_srli_pi16(asrc, mmx_0x0080);
+            asrc = add(asrc, cia);
+
+            dst = _mm_mullo_pi16(dst, asrc);
+            dst = _mm_ands_srli_pi16(dst, mmx_0x0080);
+            _mm_store_pi32(reinterpret_cast<__m32 *>(&dest[i]), dst);
+        }
+    }
+}
+
+static void QT_FASTCALL comp_func_SourceOut_lssimd(uint *dest,
+                                                   const uint *src,
+                                                   int length,
+                                                   uint const_alpha)
+{
+    if (const_alpha == 255) {
+        for (int i = 0; i < length; ++i) {
+            PRELOAD_COND2(dest, src)
+            dest[i] = BYTE_MUL(src[i], qAlpha(~dest[i]));
+        }
+    } else {
+        __m64 mmx_0x0080 = _mm_set1_pi16(0x80);
+        __m64 mmx_0x00ff = _mm_set1_pi16(0xff);
+        __m64 ca = load_alpha(const_alpha);
+        __m64 cia = negate(ca);
+        for (int i = 0; i < length; ++i) {
+            __m64 src64 = _mm_loadlo_pi8(&src[i]);
+            __m64 srca = _mm_mullo_pi16(src64, ca);
+            srca = _mm_ands_srli_pi16(srca, mmx_0x0080);
+
+            __m64 dst = _mm_loadlo_pi8(&dest[i]);
+            __m64 dia = negate(alpha(dst));
+
+            srca = _mm_mullo_pi16(srca, dia);
+            dst = _mm_mullo_pi16(dst, cia);
+            dst = _mm_adds_pu16(srca, dst);
+            dst = _mm_ands_srli_pi16(dst, mmx_0x0080);
+            _mm_store_pi32(reinterpret_cast< __m32 * >(&dest[i]), dst);
+        }
+    }
+}
+
+static void QT_FASTCALL comp_func_solid_DestinationOut_lssimd(uint * dest,
+                                                              int length,
+                                                              uint color,
+                                                              uint const_alpha)
+{
+    __m64 mmx_0x0080 = _mm_set1_pi16(0x80);
+    __m64 mmx_0x00ff = _mm_set1_pi16(0xff);
+    __m64 acolor = negate(alpha(_mm_loadlo_pi8(&color)));
+    if (const_alpha != 255) {
+        __m64 ca = load_alpha(const_alpha);
+        acolor = _mm_mullo_pi16(acolor, ca);
+        acolor = _mm_ands_srli_pi16(acolor, mmx_0x0080);
+        acolor = add(acolor, negate(ca));
+    }
+    for (int i = 0; i < length; ++i) {
+        __m64 dst = _mm_loadlo_pi8(&dest[i]);
+        dst = _mm_mullo_pi16(dst, acolor);
+        dst = _mm_ands_srli_pi16(dst, mmx_0x0080);
+        _mm_store_pi32(reinterpret_cast<__m32 *>(&dest[i]), dst);
+    }
+}
+
+static void QT_FASTCALL comp_func_DestinationOut_lssimd(uint *dest,
+                                                        const uint *src,
+                                                        int length,
+                                                        uint const_alpha)
+{
+    __m64 mmx_0x0080 = _mm_set1_pi16(0x80);
+    __m64 mmx_0x00ff = _mm_set1_pi16(0xff);
+    if (const_alpha == 255) {
+        for (int i = 0; i < length; ++i) {
+            __m64 dst = _mm_dnas_byte_mul_pi16(*(__m32 *)&dest[i],
+                        *(__m32 *)&src[i], mmx_0x0080, mmx_0x00ff);
+            _mm_store_pi32(reinterpret_cast<__m32 *>(&dest[i]), dst);
+        }
+    } else {
+        __m64 ca = load_alpha(const_alpha);
+        __m64 cia = negate(ca);
+        for (int i = 0; i < length; ++i) {
+            __m64 dst = _mm_loadlo_pi8(&dest[i]);
+            __m64 asrc = _mm_loadlo_pi8(&src[i]);
+            asrc = negate(alpha(asrc));
+            asrc = _mm_mullo_pi16(asrc, ca);
+            asrc = _mm_ands_srli_pi16(asrc, mmx_0x0080);
+            asrc = add(asrc, cia);
+
+            dst = _mm_mullo_pi16(dst, asrc);
+            dst = _mm_ands_srli_pi16(dst, mmx_0x0080);
+            _mm_store_pi32(reinterpret_cast<__m32 *>(&dest[i]), dst);
+        }
+    }
+}
+
+static void QT_FASTCALL comp_func_SourceAtop_lssimd(uint *dest,
+                                                    const uint *src,
+                                                    int length,
+                                                    uint const_alpha)
+{
+    __m64 mmx_0x0080 = _mm_set1_pi16(0x80);
+    __m64 mmx_0x00ff = _mm_set1_pi16(0xff);
+    if (const_alpha == 255) {
+        for (int i = 0; i < length; ++i) {
+            __m64 dst = _mm_adnas_byte_mul_pi16(*(__m32 *)&dest[i],
+                                *(__m32 *)&src[i], mmx_0x0080, mmx_0x00ff);
+            _mm_store_pi32(reinterpret_cast<__m32 *>(&dest[i]), dst);
+        }
+    } else {
+        __m64 ca = load_alpha(const_alpha);
+        for (int i = 0; i < length; ++i) {
+            __m64 src64 = _mm_loadlo_pi8(&src[i]);
+            src64 = _mm_mullo_pi16(src64, ca);
+            src64 = _mm_ands_srli_pi16(src64, mmx_0x0080);
+            __m64 dst = _mm_loadlo_pi8(&dest[i]);
+            __m64 asrc = negate(alpha(src64));
+
+            src64 = _mm_mullo_pi16(src64, alpha(dst));
+            dst = _mm_mullo_pi16(dst, asrc);
+            dst = _mm_adds_pu16(src64, dst);
+            dst = _mm_ands_srli_pi16(dst, mmx_0x0080);
+            _mm_store_pi32(reinterpret_cast<__m32 *>(&dest[i]), dst);
+        }
+    }
+}
+
+static void QT_FASTCALL comp_func_DestinationAtop_lssimd(uint *dest,
+                                                        const uint *src,
+                                                        int length,
+                                                        uint const_alpha)
+{
+    __m64 mmx_0x0080 = _mm_set1_pi16(0x80);
+    __m64 mmx_0x00ff = _mm_set1_pi16(0xff);
+    if (const_alpha == 255) {
+        for (int i = 0; i < length; ++i) {
+            PRELOAD_COND2(dest, src)
+            uint s = src[i];
+            uint d = dest[i];
+            dest[i] = INTERPOLATE_PIXEL_255(d, qAlpha(s), s, qAlpha(~d));
+        }
+    } else {
+        __m64 ca = load_alpha(const_alpha);
+        for (int i = 0; i < length; ++i) {
+            __m64 src64 = _mm_loadlo_pi8(&src[i]);
+            src64 = _mm_mullo_pi16(src64, ca);
+            src64 = _mm_ands_srli_pi16(src64, mmx_0x0080);
+            __m64 dst = _mm_loadlo_pi8(&dest[i]);
+            __m64 asrc = alpha(src64);
+            asrc = add(asrc, negate(ca));
+            __m64 dia = negate(alpha(dst));
+
+            src64 = _mm_mullo_pi16(src64, dia);
+            dst = _mm_mullo_pi16(dst, asrc);
+            dst = _mm_adds_pu16(src64, dst);
+            dst = _mm_ands_srli_pi16(dst, mmx_0x0080);
+            _mm_store_pi32(reinterpret_cast<__m32 *>(&dest[i]), dst);
+        }
+    }
+}
+
+static void QT_FASTCALL comp_func_XOR_lssimd(uint *dest,
+                                             const uint *src,
+                                             int length,
+                                             uint const_alpha)
+{
+    __m64 mmx_0x0080 = _mm_set1_pi16(0x80);
+    __m64 mmx_0x00ff = _mm_set1_pi16(0xff);
+    if (const_alpha == 255) {
+        for (int i = 0; i < length; ++i) {
+            PRELOAD_COND2(dest, src)
+            uint d = dest[i];
+            uint s = src[i];
+            dest[i] = INTERPOLATE_PIXEL_255(s, qAlpha(~d), d, qAlpha(~s));
+        }
+    } else {
+        __m64 ca = load_alpha(const_alpha);
+        for (int i = 0; i < length; ++i) {
+            __m64 src64 = _mm_loadlo_pi8(&src[i]);
+            src64 = _mm_mullo_pi16(src64, ca);
+            src64 = _mm_ands_srli_pi16(src64, mmx_0x0080);
+            __m64 dst = _mm_loadlo_pi8(&dest[i]);
+            __m64 sia = negate(alpha(src64));
+            __m64 dia = negate(alpha(dst));
+
+            src64 = _mm_mullo_pi16(src64, dia);
+            dst = _mm_mullo_pi16(dst, sia);
+            dst = _mm_adds_pu16(src64, dst);
+            dst = _mm_ands_srli_pi16(dst, mmx_0x0080);
+            _mm_store_pi32(reinterpret_cast<__m32 *>(&dest[i]), dst);
+        }
+    }
 }
 
 /*
